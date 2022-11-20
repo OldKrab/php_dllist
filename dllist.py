@@ -56,20 +56,31 @@ class SmallBinsCmd(gdb.Command):
         )
 
     def invoke(self, args, from_tty):
+        args = gdb.string_to_argv(args)
+
         alloc_globals = gdb.selected_frame().read_var('alloc_globals')
         heap = alloc_globals['mm_heap'].dereference()
-        slots_count = heap["free_slot"].type.sizeof // heap["free_slot"].dereference().type.sizeof
-        max_list_len = 5
+        bins_count = heap["free_slot"].type.sizeof // heap["free_slot"].dereference().type.sizeof
 
-        for i in range(slots_count):
+        bin_nums = []
+        if len(args) > 0:
+            bin = int(args[0])
+            if bin >= bins_count:
+                raise Exception("There is only %d bins!" % (bins_count))
+            bin_nums = [bin]
+        else:
+            bin_nums = range(bins_count)
+
+        max_list_len = 5
+        for bin in bin_nums:
             elems = traverse_list(
-                heap["free_slot"][i], "next_free_slot", max_list_len + 1)
+                heap["free_slot"][bin], "next_free_slot", max_list_len + 1)
 
             elems_str = " —▸ ".join(map(color_address, elems[0: max_list_len]))
             rest = " ..." if len(elems) > max_list_len else " ◂— 0x0" if len(
                 elems) > 0 else "0x0"
 
-            print("[%d]: %s%s" % (i, elems_str, rest))
+            print("[%d]: %s%s" % (bin, elems_str, rest))
 
 
 gdb.pretty_printers.append(dllist_lookup_function)
